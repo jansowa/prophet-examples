@@ -9,7 +9,8 @@ import logging
 logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
 
 
-def tune_gridsearch(df, print_tuning_results=False, regressors=(), monthly_seasonality=False):
+def tune_gridsearch(df, print_tuning_results=False, regressors=(), monthly_seasonality=False,
+                    initial='730 days', period='182 days', horizon='365 days'):
     param_grid = {
         'changepoint_prior_scale': [0.001, 0.01, 0.1, 0.5],
         'seasonality_prior_scale': [0.01, 0.1, 1.0, 10.0],
@@ -30,7 +31,7 @@ def tune_gridsearch(df, print_tuning_results=False, regressors=(), monthly_seaso
         logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
         logging.getLogger('prophet').setLevel(logging.CRITICAL)
         logging.getLogger('fbprophet').setLevel(logging.CRITICAL)
-        df_cv = cross_validation(m, '365 days', initial='730 days', period='180 days', parallel="processes")
+        df_cv = cross_validation(m, horizon, initial=initial, period=period, parallel="processes")
         df_p = performance_metrics(df_cv, rolling_window=1)
         rmses.append(df_p['rmse'].mean())
         maes.append(df_p['mae'].mean())
@@ -46,7 +47,8 @@ def tune_gridsearch(df, print_tuning_results=False, regressors=(), monthly_seaso
     return tuning_results
 
 
-def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regressors=(), monthly_seasonality=False):
+def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regressors=(), monthly_seasonality=False,
+                initial='730 days', period='182 days', horizon='365 days'):
 
     def objective(trial) -> float:
         changepoint_prior_scale = trial.suggest_loguniform('changepoint_prior_scale', 0.001, 1.0)
@@ -66,7 +68,7 @@ def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regre
         logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
         logging.getLogger('prophet').setLevel(logging.CRITICAL)
         logging.getLogger('fbprophet').setLevel(logging.CRITICAL)
-        df_cv = cross_validation(m, initial='730 days', period='182 days', horizon='365 days', parallel="processes")
+        df_cv = cross_validation(m, initial=initial, period=period, horizon=horizon, parallel="processes")
         df_p = performance_metrics(df_cv, rolling_window=1)
 
         score = df_p[metric].mean()
@@ -97,7 +99,8 @@ def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regre
     for key, value in best_trial.params.items():
         print("    {}: {}".format(key, value))
 
-def tune_optuna_logistic(df, cap, save_study_name=None, trials_number=256, metric="mae", regressors=(), monthly_seasonality=False):
+def tune_optuna_logistic(df, cap, save_study_name=None, trials_number=256, metric="mae", regressors=(), monthly_seasonality=False,
+                         initial='730 days', period='182 days', horizon='365 days'):
 
     def objective(trial) -> float:
         changepoint_prior_scale = trial.suggest_loguniform('changepoint_prior_scale', 0.001, 1.0)
@@ -118,7 +121,7 @@ def tune_optuna_logistic(df, cap, save_study_name=None, trials_number=256, metri
         logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
         logging.getLogger('prophet').setLevel(logging.CRITICAL)
         logging.getLogger('fbprophet').setLevel(logging.CRITICAL)
-        df_cv = cross_validation(m, initial='730 days', period='182 days', horizon='365 days', parallel="processes")
+        df_cv = cross_validation(m, initial=initial, period=period, horizon=horizon, parallel="processes")
         df_p = performance_metrics(df_cv, rolling_window=1)
 
         score = df_p[metric].mean()
