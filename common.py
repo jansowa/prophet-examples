@@ -6,6 +6,7 @@ from prophet.diagnostics import performance_metrics
 from prophet.plot import plot_cross_validation_metric
 import optuna
 import numpy as np
+import time
 
 from prophet import Prophet
 import matplotlib.pyplot as plt
@@ -54,7 +55,7 @@ def tune_gridsearch(df, print_tuning_results=False, regressors=(), monthly_seaso
 
 
 def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regressors=(), monthly_seasonality=False,
-                initial='730 days', period='182 days', horizon='365 days'):
+                initial='730 days', period='182 days', horizon='365 days', manual_yearly_seasonality=False):
 
     def objective(trial) -> float:
         changepoint_prior_scale = trial.suggest_loguniform('changepoint_prior_scale', 0.001, 1.0)
@@ -70,6 +71,8 @@ def tune_optuna(df, save_study_name=None, trials_number=256, metric="mae", regre
             m.add_regressor(regressor)
         if monthly_seasonality:
             m.add_seasonality(name='monthly', period=30.4, fourier_order=5)
+        if manual_yearly_seasonality:
+            m.add_seasonality(name='yearly', period=365, fourier_order=10)
         m.fit(df)  # Fit model with given params
         logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
         logging.getLogger('prophet').setLevel(logging.CRITICAL)
