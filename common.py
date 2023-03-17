@@ -1,16 +1,11 @@
-from prophet import Prophet
 import itertools
 import pandas as pd
 from prophet.diagnostics import cross_validation
 from prophet.diagnostics import performance_metrics
-from prophet.plot import plot_cross_validation_metric
 import optuna
-import numpy as np
-import time
 
 from prophet import Prophet
 import matplotlib.pyplot as plt
-import datetime
 
 import logging
 logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
@@ -160,3 +155,20 @@ def tune_optuna_logistic(df, cap, save_study_name=None, trials_number=256, metri
     print("  Params: ")
     for key, value in best_trial.params.items():
         print("    {}: {}".format(key, value))
+
+
+def plot_cv_forecast_df(df_cv, figsize=(8, 4), title="Cross-validation forecasts", xlabel="Date", ylabel="Forecast", lower_date=None, upper_date=None):
+    arg_df = df_cv
+    if lower_date is not None and upper_date is not None:
+        arg_df = df_cv[(df_cv.ds >= lower_date) & (df_cv.ds < upper_date)]
+    ds = arg_df["ds"]
+    y = arg_df["y"]
+    yhat = arg_df["yhat"]
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(ds, y, 'b.', label='Real data')
+    ax.plot(ds, yhat, 'r.', label='Forecast')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.legend(loc='upper left')
+    ax.set_title(title)
+    plt.show()
