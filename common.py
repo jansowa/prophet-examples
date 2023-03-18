@@ -3,6 +3,7 @@ import pandas as pd
 from prophet.diagnostics import cross_validation
 from prophet.diagnostics import performance_metrics
 import optuna
+import numpy as np
 
 from prophet import Prophet
 import matplotlib.pyplot as plt
@@ -156,6 +157,57 @@ def tune_optuna_logistic(df, cap, save_study_name=None, trials_number=256, metri
     for key, value in best_trial.params.items():
         print("    {}: {}".format(key, value))
 
+def tune_optuna_mae_exp(df, save_study_name=None, trials_number=256, regressors=(), monthly_seasonality=False,
+                         manual_yearly_seasonality=False, initial='365 days', period='7 days', horizon='7 days'):
+
+    def objective(trial) -> float:
+        changepoint_prior_scale = trial.suggest_loguniform('changepoint_prior_scale', 0.001, 1.0)
+        seasonality_prior_scale = trial.suggest_loguniform('seasonality_prior_scale', 0.01, 100.0)
+        holidays_prior_scale = trial.suggest_loguniform('holidays_prior_scale', 0.01, 100.0)
+        seasonality_mode = trial.suggest_categorical('seasonality_mode', ['additive', 'multiplicative'])
+        changepoint_range = trial.suggest_uniform('changepoint_range', 0.65, 0.95)
+
+        m = Prophet(changepoint_prior_scale=changepoint_prior_scale, seasonality_prior_scale=seasonality_prior_scale,
+                    holidays_prior_scale=holidays_prior_scale, seasonality_mode=seasonality_mode,
+                    changepoint_range=changepoint_range, growth='logistic')
+        for regressor in regressors:
+            m.add_regressor(regressor)
+        if monthly_seasonality:
+            m.add_seasonality(name='monthly', period=30.4, fourier_order=5)
+        if manual_yearly_seasonality:
+            m.add_seasonality(name='yearly', period=365, fourier_order=10)
+        m.fit(df)  # Fit model with given params
+        logging.getLogger('cmdstanpy').setLevel(logging.CRITICAL)
+        logging.getLogger('prophet').setLevel(logging.CRITICAL)
+        logging.getLogger('fbprophet').setLevel(logging.CRITICAL)
+        df_cv = cross_validation(m, initial=initial, period=period, horizon=horizon, parallel="processes")
+        mae = np.abs(np.exp(df_cv["yhat"]) - np.exp(df_cv["y"])).mean()
+        return mae
+
+    if save_study_name is None:
+        study = optuna.create_study(direction="minimize", load_if_exists=True)
+    else:
+        storage_name = "sqlite:///{}.db".format(save_study_name)
+        study = optuna.create_study(study_name=save_study_name, direction="minimize", storage=storage_name,
+                                    load_if_exists=True)
+
+    study.enqueue_trial({
+        "changepoint_prior_scale": 0.05,
+        "seasonality_prior_scale": 10.0,
+        "holidays_prior_scale": 10.0,
+        "seasonality_mode": "additive",
+        "changepoint_range": 0.8
+    })
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    study.optimize(objective, n_trials=trials_number)
+    print("Best trial:")
+    best_trial = study.best_trial
+
+    print("  MAE: ", str(best_trial.value))
+
+    print("  Params: ")
+    for key, value in best_trial.params.items():
+        print("    {}: {}".format(key, value))
 
 def plot_cv_forecast_df(df_cv, figsize=(8, 4), title="Cross-validation forecasts", xlabel="Date", ylabel="Forecast", lower_date=None, upper_date=None):
     arg_df = df_cv
